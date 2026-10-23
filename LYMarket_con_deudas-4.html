@@ -1,0 +1,367 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#171717">
+<title>L&Y Market · Inventario</title>
+<style>
+:root{--black:#171717;--gold:#c7a33b;--gold2:#eadcae;--white:#fff;--paper:#fff;--ink:#202020;--muted:#686868;--line:#e6d9ad;--pale:#fffaf0;--red:#a52d2d;--green:#22633e}
+*{box-sizing:border-box}body{margin:0;background:var(--paper);color:var(--ink);font:16px/1.4 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+header{background:var(--black);color:#fff;padding:20px 15px 16px;border-bottom:4px solid var(--gold)}
+header h1{margin:0;color:var(--gold);font-size:27px}header p{margin:4px 0 0;color:#f0dfaa;font-size:14px}
+main{max-width:900px;margin:auto;padding:12px}
+.card{background:#fff;border:1px solid var(--line);border-top:3px solid var(--gold);border-radius:15px;padding:14px;margin:12px 0;box-shadow:0 2px 8px #0000000a}
+h2{font-size:19px;margin:0 0 10px}h3{font-size:16px;margin:12px 0 7px}
+label{display:block;font-size:13px;color:#555;margin:0 0 4px}
+input,select{font:inherit;width:100%;padding:10px;border:1px solid #d7d7d7;border-radius:9px;background:#fff;color:#222;min-width:0}
+input:focus,select:focus{outline:2px solid var(--gold);border-color:var(--gold)}
+button{font:inherit;font-weight:650;border:0;border-radius:10px;background:var(--black);color:#fff;padding:11px 13px;cursor:pointer}
+button.gold{background:var(--gold);color:#171717}button.light{background:#fff7df;color:#3b3012;border:1px solid var(--gold2)}button.danger{background:#fff0f0;color:var(--red);border:1px solid #e9baba}button:disabled{opacity:.45;cursor:not-allowed}
+.row{display:flex;gap:8px;align-items:end}.row>*{flex:1}.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.grid3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.small{font-size:12px;color:var(--muted)}.notice{background:#fff9e8;border:1px solid var(--gold2);padding:10px;border-radius:10px;font-size:13px}
+.stats{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.stat{background:var(--pale);border:1px solid var(--gold2);border-radius:11px;padding:11px}.stat span{display:block;color:var(--muted);font-size:12px}.stat strong{font-size:18px}
+table{width:100%;border-collapse:collapse;font-size:13px}th,td{text-align:left;padding:8px 5px;border-bottom:1px solid #eee;vertical-align:middle}th{background:#fff9e8;color:#3b3012}td input{padding:7px;font-size:14px}
+.tablewrap{overflow-x:auto}.product-name{font-weight:700}.price{white-space:nowrap}.actions{display:flex;gap:6px;flex-wrap:wrap}
+.daystatus{display:inline-block;border-radius:99px;padding:4px 9px;font-size:12px;font-weight:700;background:#fff0c2;color:#5c4710}.daystatus.closed{background:#e3f5e8;color:#205d35}
+hr{border:0;border-top:1px solid #eee;margin:13px 0}.hidden{display:none!important}
+@media(min-width:650px){.stats{grid-template-columns:repeat(4,minmax(0,1fr))}.grid{grid-template-columns:repeat(4,minmax(0,1fr))}}
+@media(max-width:420px){.grid3{grid-template-columns:repeat(2,minmax(0,1fr))}.row{align-items:stretch;flex-direction:column}.row>*{width:100%}table{font-size:12px}}
+</style>
+</head>
+<body>
+<header><h1>L&Y Market</h1><p>Inventario · Ventas · Cierre de caja</p></header>
+<main>
+<section class="card" id="syncPanel">
+<h2>Sincronización entre teléfonos</h2>
+<p id="syncStatus" class="notice">Sin conectar. Los cambios todavía se guardan solo en este dispositivo.</p>
+<div class="grid"><div><label for="syncEmail">Correo autorizado</label><input id="syncEmail" type="email" autocomplete="username" placeholder="Tu correo electrónico"></div><div><label for="syncPassword">Contraseña de Firebase</label><input id="syncPassword" type="password" autocomplete="current-password" placeholder="Contraseña de tu cuenta"></div></div>
+<p><button id="syncLogin" class="gold">Conectar / Iniciar sesión</button> <button id="syncLogout" class="light">Cerrar sesión</button></p>
+<p class="small">Para conectar, el correo debe estar registrado en Firebase Authentication y autorizado en las reglas de Firestore. No compartas tu contraseña con nadie. Mientras no diga “Sincronización activa”, los datos no se comparten entre teléfonos.</p>
+</section>
+<div class="notice"><b>Importante:</b> antes de activar la sincronización, conserva un respaldo con “Exportar respaldo”. No borres los datos del navegador.</div>
+
+<section class="card">
+  <h2>1. Jornada de trabajo</h2>
+  <div class="row">
+    <div><label for="workDate">Fecha de la jornada</label><input id="workDate" type="date"></div>
+    <div><label>Estado</label><div id="dayStatus" class="daystatus">Día abierto</div></div>
+  </div>
+  <p class="small">Al cerrar el día se guardan sus resultados y las existencias finales pasan a ser las iniciales de la siguiente jornada.</p>
+  <div id="closedWarning" class="notice hidden">Esta jornada está cerrada. No se puede modificar. Elige la fecha de hoy para continuar, siempre que el día anterior esté cerrado.</div>
+</section>
+
+<section class="card">
+  <h2>2. Catálogo de productos</h2>
+  <p class="small">Los 14 productos iniciales ya están cargados. Puedes cambiar precios, nombres y unidades o añadir otros.</p>
+  <div class="tablewrap"><table><thead><tr><th>Producto</th><th>Unidad</th><th>Precio (CUP)</th><th></th></tr></thead><tbody id="catalogRows"></tbody></table></div>
+  <hr>
+  <h3>Añadir producto</h3>
+  <div class="grid">
+    <div><label for="newName">Nombre</label><input id="newName" placeholder="Ej. Leche"></div>
+    <div><label for="newUnit">Unidad de venta</label><input id="newUnit" placeholder="Ej. litro, libra, paquete"></div>
+    <div><label for="newPrice">Precio (CUP)</label><input id="newPrice" type="number" min="0" step="0.01" placeholder="0"></div>
+    <div style="display:flex;align-items:end"><button id="addProduct" class="gold" style="width:100%">Añadir producto</button></div>
+  </div>
+</section>
+
+<section class="card">
+  <h2>3. Inventario del día</h2>
+  <p class="small">Anota las existencias que quedan al cerrar. Las ventas y los importes se calculan automáticamente. Para productos por peso, puedes usar decimales, por ejemplo 1,5 libras.</p>
+  <div class="stats">
+    <div class="stat"><span>Ventas calculadas</span><strong id="salesTotal">0 CUP</strong></div>
+    <div class="stat"><span>Unidades vendidas (suma)</span><strong id="unitsTotal">0</strong></div>
+    <div class="stat"><span>Productos en catálogo</span><strong id="productCount">14</strong></div>
+    <div class="stat"><span>Fecha seleccionada</span><strong id="dateLabel">—</strong></div>
+  </div>
+  <div class="tablewrap" style="margin-top:10px"><table><thead><tr><th>Producto</th><th>Inicio</th><th>Entradas</th><th>Final</th><th>Vend.</th><th>Importe</th></tr></thead><tbody id="inventoryRows"></tbody></table></div>
+  <p class="small">Venta = Inicio + Entradas − Final. Importe = Venta × precio actual. Si el día anterior está cerrado, el inventario inicial se completa con su inventario final.</p>
+</section>
+
+
+<section class="card" id="moneyCounter">
+  <h2>4. Contador de billetes</h2>
+  <p class="small">Escribe cuántos billetes tienes de cada denominación. El total se calcula automáticamente.</p>
+  <div class="grid" id="billInputs"></div>
+  <div class="stats" style="margin-top:10px">
+    <div class="stat"><span>Total contado en billetes</span><strong id="billTotal">0 CUP</strong></div>
+  </div>
+  <div class="actions" style="margin-top:10px">
+    <button type="button" class="gold" id="useBillTotal">Pasar total al cierre de caja</button>
+    <button type="button" class="light" id="clearBills">Limpiar contador</button>
+  </div>
+  <p class="small">El contador no modifica el inventario. Al pasar el total, sustituye el valor del campo “Efectivo contado al cierre”.</p>
+</section>
+
+<section class="card">
+  <h2>5. Cierre de caja</h2>
+  <div class="grid">
+    <div><label for="cashStart">Efectivo inicial (CUP)</label><input id="cashStart" type="number" min="0" step="0.01" value="0"></div>
+    <div><label for="creditSales">Ventas a crédito (CUP)</label><input id="creditSales" type="number" min="0" step="0.01" value="0"></div>
+    <div><label for="expenses">Gastos pagados de caja (CUP)</label><input id="expenses" type="number" min="0" step="0.01" value="0"></div>
+    <div><label for="withdrawals">Retiros de caja (CUP)</label><input id="withdrawals" type="number" min="0" step="0.01" value="0"></div>
+    <div><label for="cashCounted">Efectivo contado al cierre (CUP)</label><input id="cashCounted" type="number" min="0" step="0.01" value="0"></div>
+  </div>
+  <div class="stats" style="margin-top:10px">
+    <div class="stat"><span>Efectivo esperado</span><strong id="cashExpected">0 CUP</strong></div>
+    <div class="stat"><span>Diferencia (contado − esperado)</span><strong id="cashDiff">0 CUP</strong></div>
+  </div>
+  <p class="small">Efectivo esperado = inicial + ventas − ventas a crédito − gastos − retiros. Asegúrate de que las ventas calculadas reflejen tus ventas reales.</p>
+</section>
+
+<section class="card">
+  <h2>6. Guardar el día</h2>
+  <p id="closeHint" class="small">Revisa las cantidades y el efectivo antes de cerrar.</p>
+  <div class="actions">
+    <button id="saveDraft" class="light">Guardar progreso</button>
+    <button id="closeDay" class="gold">Cerrar día y guardar</button>
+  </div>
+  <p class="small">Al cerrar, la jornada queda bloqueada. El día siguiente tomará automáticamente las existencias finales como inventario inicial.</p>
+</section>
+
+<section class="card">
+  <h2>7. Historial por fechas</h2>
+  <div class="row">
+    <div><label for="historyDate">Consultar fecha</label><input id="historyDate" type="date"></div>
+    <div><button id="viewHistory" class="light">Ver jornada</button></div>
+  </div>
+  <div id="historyResult" class="small" style="margin-top:10px">Selecciona una fecha y pulsa “Ver jornada”.</div>
+  <hr>
+  <div class="actions">
+    <button id="exportCsv" class="light">Exportar historial CSV</button>
+    <button id="exportBackup" class="gold">Exportar respaldo</button>
+    <button id="importBackup" class="light">Importar respaldo</button>
+    <input id="backupFile" class="hidden" type="file" accept=".json,application/json">
+  </div>
+  <p class="small">Guarda el respaldo en un lugar seguro. El archivo CSV se puede abrir con una hoja de cálculo.</p>
+</section>
+<section class="card" id="debtsSection">
+  <h2>8. Deudas de clientes</h2>
+  <div class="stats">
+    <div class="stat"><span>Total pendiente</span><strong id="debtGrandTotal">0 CUP</strong></div>
+    <div class="stat"><span>Clientes con deuda</span><strong id="debtClientCount">0</strong></div>
+  </div>
+  <hr>
+  <h3>Registrar compra fiada</h3>
+  <div class="grid">
+    <div><label for="debtClient">Nombre del cliente</label><input id="debtClient" placeholder="Nombre y apellidos"></div>
+    <div><label for="debtDate">Fecha</label><input id="debtDate" type="date"></div>
+    <div><label for="debtConcept">Concepto / compra</label><input id="debtConcept" placeholder="Ej. arroz, aceite..."></div>
+    <div><label for="debtAmount">Importe (CUP)</label><input id="debtAmount" type="number" min="0.01" step="0.01" placeholder="0.00"></div>
+  </div>
+  <p class="small">Escribe el mismo nombre para añadir una compra al saldo existente de un cliente.</p>
+  <button id="addDebt" class="gold">Guardar deuda / compra fiada</button>
+  <hr>
+  <h3>Buscar cliente</h3>
+  <input id="debtSearch" placeholder="Escribe el nombre del cliente...">
+  <div id="debtClientsList" style="margin-top:10px"></div>
+  <div id="debtDetail" class="hidden"></div>
+</section>
+<footer class="small" style="text-align:center;padding:12px 0 25px">L&Y Market · Negro y dorado · Fondo blanco</footer>
+</main>
+<script>
+(function(){
+'use strict';
+const initialProducts = [
+ {id:'rice-lb',name:'Arroz',unit:'Libra',price:400},
+ {id:'sugar-lb',name:'Azúcar',unit:'Libra',price:550},
+ {id:'rice-kg',name:'Arroz',unit:'Paquete de 1 kg',price:900},
+ {id:'detergent-400',name:'Detergente',unit:'Paquete de 400 g',price:800},
+ {id:'beans-kg',name:'Frijol',unit:'Paquete de 1 kg',price:1300},
+ {id:'beans-lb',name:'Frijol',unit:'Libra',price:500},
+ {id:'nylon-bag',name:'Javitas de nylon',unit:'Unidad',price:20},
+ {id:'beer',name:'Cerveza',unit:'Unidad',price:600},
+ {id:'ham-lb',name:'Jamonada',unit:'Libra',price:500},
+ {id:'laundry-soap',name:'Jabón de lavar',unit:'Unidad',price:500},
+ {id:'oil-900',name:'Aceite',unit:'Botella de 900 ml',price:3000},
+ {id:'tomato-puree',name:'Puré de tomate',unit:'Unidad',price:840},
+ {id:'chicken-pack',name:'Pollo',unit:'Paquete',price:9500},
+ {id:'pelly',name:'Pelly',unit:'Unidad',price:70}
+];
+const STORE='lymarket_v3_offline';
+const firebaseConfig={apiKey:'AIzaSyDlU9EPD_0fTNgsCNfQwD59HrqwifZjvrM',authDomain:'ly-market-98e20.firebaseapp.com',projectId:'ly-market-98e20',storageBucket:'ly-market-98e20.firebasestorage.app',messagingSenderId:'987062801339',appId:'1:987062801339:web:a1930dcabd3dd416756a9e',measurementId:'G-TZK4XSQMGY'};
+let cloudReady=false, cloudApplying=false, cloudTimer=null, cloudUnsub=null, firebaseAuth=null, cloudDoc=null;
+const $=id=>document.getElementById(id);
+const today=()=>{const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')};
+const money=n=>(Number(n)||0).toLocaleString('es-ES',{maximumFractionDigits:2})+' CUP';
+const num=v=>Math.max(0,Number(v)||0);
+let state;
+function load(){
+ try{const s=localStorage.getItem(STORE); if(s){state=JSON.parse(s);if(!Array.isArray(state.products)||!state.days)throw 0;return}}catch(e){}
+ state={products:initialProducts.map(p=>({...p})),days:{},activeDate:today(),debts:[]};
+ save();
+}
+function save(){if(!Array.isArray(state.debts))state.debts=[];localStorage.setItem(STORE,JSON.stringify(state));if(cloudReady&&!cloudApplying)scheduleCloudSave()}
+function syncMessage(msg){const el=$('syncStatus');if(el)el.textContent=msg}
+function scheduleCloudSave(){clearTimeout(cloudTimer);cloudTimer=setTimeout(async()=>{try{if(!cloudReady||!cloudDoc)return;await cloudDoc.set({state:JSON.parse(JSON.stringify(state)),updatedAt:firebase.firestore.FieldValue.serverTimestamp(),updatedBy:firebaseAuth.currentUser.email});syncMessage('Sincronización activa. Último guardado enviado a la nube.')}catch(e){syncMessage('Error al sincronizar: '+(e.code||e.message)+'. Revisa las reglas de Firestore.')}} ,700)}
+async function connectFirebase(){try{if(!window.firebase){syncMessage('No se pudieron cargar los servicios de Firebase. Comprueba la conexión a internet.');return}if(!firebase.apps.length)firebase.initializeApp(firebaseConfig);const auth=firebase.auth();firebaseAuth=auth;await auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);const email=$('syncEmail').value.trim().toLowerCase(),password=$('syncPassword').value;if(!email||!password){syncMessage('Escribe tu correo y contraseña.');return}syncMessage('Conectando…');try{await auth.signInWithEmailAndPassword(email,password)}catch(e){if(e.code==='auth/user-not-found')syncMessage('Esta cuenta no existe todavía. Debe crearse en Firebase Authentication.');else if(e.code==='auth/invalid-credential'||e.code==='auth/wrong-password')syncMessage('Correo o contraseña incorrectos.');else syncMessage('No se pudo iniciar sesión: '+(e.code||e.message));return}const user=auth.currentUser;if(!['lymarketcontrol@gmail.com','yadiselmegretislen@gmail.com'].includes((user.email||'').toLowerCase())){await auth.signOut();syncMessage('Este correo no está autorizado para editar L&Y Market.');return}cloudDoc=firebase.firestore().collection('sharedData').doc('lymarket');const snap=await cloudDoc.get();if(snap.exists&&snap.data().state){cloudApplying=true;state=snap.data().state;if(!Array.isArray(state.debts))state.debts=[];localStorage.setItem(STORE,JSON.stringify(state));initUI();renderBillCounter();$('debtDate').value=today();renderDebts();cloudApplying=false;}else{await cloudDoc.set({state:JSON.parse(JSON.stringify(state)),updatedAt:firebase.firestore.FieldValue.serverTimestamp(),updatedBy:user.email});}cloudReady=true;if(cloudUnsub)cloudUnsub();cloudUnsub=cloudDoc.onSnapshot(doc=>{if(!doc.exists||!doc.data().state)return;const incoming=doc.data().state;const incomingAt=doc.data().updatedAt&&doc.data().updatedAt.toMillis?doc.data().updatedAt.toMillis():0;const localAt=window.__lyLastCloudAt||0;if(incomingAt&&incomingAt<=localAt)return;window.__lyLastCloudAt=incomingAt;cloudApplying=true;state=incoming;localStorage.setItem(STORE,JSON.stringify(state));initUI();renderBillCounter();renderDebts();cloudApplying=false;syncMessage('Sincronización activa. Los datos compartidos están actualizados.');},e=>syncMessage('Conexión perdida o reglas de Firestore no permiten leer: '+(e.code||e.message)));syncMessage('Sincronización activa. Este teléfono ya está conectado.');$('syncPassword').value='';}catch(e){cloudApplying=false;syncMessage('Error de conexión: '+(e.code||e.message));}}
+function debtBalance(c){return c.moves.reduce((n,m)=>n+(m.type==='debt'?m.amount:-m.amount),0)}
+function renderDebts(){if(!Array.isArray(state.debts))state.debts=[];const clients=state.debts.map(c=>({...c,balance:debtBalance(c)})).filter(c=>c.balance>0.0001);$('debtGrandTotal').textContent=money(clients.reduce((n,c)=>n+c.balance,0));$('debtClientCount').textContent=String(clients.length);const q=($('debtSearch').value||'').trim().toLocaleLowerCase('es');const all=state.debts.filter(c=>c.name.toLocaleLowerCase('es').includes(q));$('debtClientsList').innerHTML=all.length?all.map(c=>{const b=debtBalance(c);return `<div class="card" style="margin:8px 0;padding:10px"><div style="display:flex;justify-content:space-between;gap:8px;align-items:center"><div><b>${escapeHtml(c.name)}</b><div class="small">${c.moves.length} movimiento(s)</div></div><div style="text-align:right"><b>${money(b)}</b><div class="small">${b<=0.0001?'Pagada':'Saldo pendiente'}</div></div></div><button class="light" data-debt-view="${c.id}" style="margin-top:8px">Ver historial / registrar pago</button></div>`}).join(''):'<p class="small">No hay clientes que coincidan con la búsqueda.</p>';document.querySelectorAll('[data-debt-view]').forEach(b=>b.addEventListener('click',()=>showDebtDetail(b.dataset.debtView)));}
+function showDebtDetail(id){const c=state.debts.find(x=>x.id===id);if(!c)return;const balance=debtBalance(c);const box=$('debtDetail');box.classList.remove('hidden');box.innerHTML=`<hr><h3>Cuenta de ${escapeHtml(c.name)}</h3><p><b>Saldo pendiente: ${money(balance)}</b></p><div class="grid"><div><label for="payAmount">Pago recibido (CUP)</label><input id="payAmount" type="number" min="0.01" step="0.01" placeholder="Importe del pago"></div><div><label for="payDate">Fecha del pago</label><input id="payDate" type="date" value="${today()}"></div></div><p><button id="saveDebtPayment" class="gold">Registrar pago</button> <button id="closeDebtDetail" class="light">Cerrar</button></p><h3>Historial de movimientos</h3><div>${c.moves.slice().reverse().map(m=>`<div style="padding:8px 0;border-bottom:1px solid #eee"><b>${m.type==='debt'?'Compra fiada':'Pago recibido'} · ${money(m.amount)}</b><div class="small">${escapeHtml(m.date)} · ${escapeHtml(m.concept||'')}</div></div>`).join('')||'<p class="small">Sin movimientos.</p>'}</div>`;$('saveDebtPayment').addEventListener('click',()=>{const amount=Number($('payAmount').value);const date=$('payDate').value||today();if(!(amount>0)){alert('Escribe un importe válido.');return}if(amount>debtBalance(c)+0.0001){alert('El pago no puede superar la deuda pendiente.');return}c.moves.push({id:'m-'+Date.now(),type:'payment',amount,date,concept:'Pago de deuda'});save();renderDebts();showDebtDetail(id);alert('Pago guardado. Saldo pendiente: '+money(debtBalance(c)));});$('closeDebtDetail').addEventListener('click',()=>box.classList.add('hidden'));}
+function getDay(date,create=true){
+ if(!state.days[date]&&create){
+  const prev=Object.keys(state.days).filter(d=>d<date&&state.days[d].closed).sort().pop();
+  const prevDay=prev?state.days[prev]:null;
+  const inventory={};
+  state.products.forEach(p=>{inventory[p.id]={start:prevDay?(Number(prevDay.inventory[p.id]?.final)||0):0,entry:0,final:prevDay?(Number(prevDay.inventory[p.id]?.final)||0):0}});
+  state.days[date]={closed:false,inventory,cash:{cashStart:0,creditSales:0,expenses:0,withdrawals:0,cashCounted:0}};
+ }
+ return state.days[date];
+}
+function isBlocked(date){const d=getDay(date,false);if(d&&d.closed)return true;const prior=Object.keys(state.days).filter(x=>x<date).sort().pop();return !!(prior&& !state.days[prior].closed)}
+function renderCatalog(){
+ $('catalogRows').innerHTML='';
+ state.products.forEach(p=>{
+  const tr=document.createElement('tr');
+  tr.innerHTML=`<td><input aria-label="Nombre" data-cat-name="${p.id}"></td><td><input aria-label="Unidad" data-cat-unit="${p.id}"></td><td><input aria-label="Precio" type="number" min="0" step=".01" data-cat-price="${p.id}"></td><td><button class="danger" data-remove="${p.id}" aria-label="Eliminar">×</button></td>`;
+  $('catalogRows').appendChild(tr);
+  tr.querySelector(`[data-cat-name="${p.id}"]`).value=p.name;
+  tr.querySelector(`[data-cat-unit="${p.id}"]`).value=p.unit;
+  tr.querySelector(`[data-cat-price="${p.id}"]`).value=p.price;
+ });
+ document.querySelectorAll('[data-cat-name],[data-cat-unit],[data-cat-price]').forEach(el=>el.addEventListener('change',()=>{
+  const p=state.products.find(x=>x.id===el.dataset.catName||x.id===el.dataset.catUnit||x.id===el.dataset.catPrice);
+  if(!p)return;
+  if(el.dataset.catName)p.name=el.value.trim()||p.name;
+  if(el.dataset.catUnit)p.unit=el.value.trim()||p.unit;
+  if(el.dataset.catPrice)p.price=num(el.value);
+  save();renderInventory();
+ }));
+ document.querySelectorAll('[data-remove]').forEach(btn=>btn.addEventListener('click',()=>{
+  const p=state.products.find(x=>x.id===btn.dataset.remove);
+  if(!p||!confirm('¿Eliminar '+p.name+' ('+p.unit+') del catálogo?'))return;
+  state.products=state.products.filter(x=>x.id!==p.id);save();renderCatalog();renderInventory();
+ }));
+}
+function renderInventory(){
+ const date=$('workDate').value||today();const d=getDay(date);
+ const blocked=d.closed||isBlocked(date);
+ $('dayStatus').textContent=d.closed?'Día cerrado':'Día abierto';
+ $('dayStatus').className='daystatus'+(d.closed?' closed':'');
+ $('closedWarning').classList.toggle('hidden',!d.closed);
+ $('closeDay').disabled=blocked;$('saveDraft').disabled=blocked;
+ ['cashStart','creditSales','expenses','withdrawals','cashCounted'].forEach(k=>{$(k).disabled=blocked;$(k).value=d.cash[k]??0});
+ $('inventoryRows').innerHTML='';
+ let total=0,units=0;
+ state.products.forEach(p=>{
+  if(!d.inventory[p.id])d.inventory[p.id]={start:0,entry:0,final:0};
+  const v=d.inventory[p.id];
+  const sold=Math.max(0,num(v.start)+num(v.entry)-num(v.final));
+  const amount=sold*num(p.price);total+=amount;units+=sold;
+  const tr=document.createElement('tr');
+  tr.innerHTML=`<td><div class="product-name"></div><div class="small"></div></td><td><input type="number" min="0" step=".01" data-start="${p.id}" aria-label="Inventario inicial"></td><td><input type="number" min="0" step=".01" data-entry="${p.id}" aria-label="Entradas"></td><td><input type="number" min="0" step=".01" data-final="${p.id}" aria-label="Inventario final"></td><td class="sold"></td><td class="amount"></td>`;
+  tr.children[0].children[0].textContent=p.name;tr.children[0].children[1].textContent=p.unit+' · '+money(p.price);
+  tr.querySelector('[data-start]').value=v.start??0;tr.querySelector('[data-entry]').value=v.entry??0;tr.querySelector('[data-final]').value=v.final??v.start??0;
+  tr.querySelectorAll('input').forEach(inp=>{
+   inp.disabled=blocked;
+   inp.addEventListener('change',()=>{
+    const key=inp.dataset.start?'start':inp.dataset.entry?'entry':'final';
+    v[key]=num(inp.value);
+    // Inventory opening stock is seeded from the last closed day and cannot be edited manually on later days.
+    if(key==='start' && hasPreviousClosed(date)){v.start=openingFromPrevious(date,p.id);inp.value=v.start}
+    save();renderInventory();
+   });
+  });
+  tr.querySelector('.sold').textContent=String(sold);
+  tr.querySelector('.amount').textContent=money(amount);
+  $('inventoryRows').appendChild(tr);
+ });
+ $('salesTotal').textContent=money(total);$('unitsTotal').textContent=String(units);$('productCount').textContent=String(state.products.length);$('dateLabel').textContent=date;
+ const cashExpected=num(d.cash.cashStart)+total-num(d.cash.creditSales)-num(d.cash.expenses)-num(d.cash.withdrawals);
+ $('cashExpected').textContent=money(cashExpected);$('cashDiff').textContent=money(num(d.cash.cashCounted)-cashExpected);
+ $('closeHint').textContent=blocked?'Esta jornada no se puede modificar.':`Comprueba los datos: ventas ${money(total)}; efectivo esperado ${money(cashExpected)}.`;
+}
+function hasPreviousClosed(date){return Object.keys(state.days).some(x=>x<date&&state.days[x].closed)}
+function openingFromPrevious(date,pid){const prev=Object.keys(state.days).filter(x=>x<date&&state.days[x].closed).sort().pop();return prev?num(state.days[prev].inventory[pid]?.final):0}
+function recalc(){const date=$('workDate').value||today();const d=getDay(date);['cashStart','creditSales','expenses','withdrawals','cashCounted'].forEach(k=>d.cash[k]=num($(k).value));save();renderInventory()}
+function escapeHtml(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+function history(){
+ const date=$('historyDate').value;const d=state.days[date];if(!date||!d){$('historyResult').textContent='No hay datos guardados para esa fecha.';return}
+ const rows=state.products.map(p=>{const v=d.inventory[p.id]||{start:0,entry:0,final:0};const sold=Math.max(0,num(v.start)+num(v.entry)-num(v.final));const price=(d.priceSnapshot&&d.priceSnapshot[p.id]!=null)?num(d.priceSnapshot[p.id]):num(p.price);return `<tr><td>${escapeHtml(p.name)} (${escapeHtml(p.unit)})</td><td>${v.start}</td><td>${v.entry}</td><td>${v.final}</td><td>${sold}</td><td>${money(sold*price)}</td></tr>`}).join('');
+ const total=state.products.reduce((sum,p)=>{const v=d.inventory[p.id]||{};const price=(d.priceSnapshot&&d.priceSnapshot[p.id]!=null)?num(d.priceSnapshot[p.id]):num(p.price);return sum+Math.max(0,num(v.start)+num(v.entry)-num(v.final))*price},0);
+ $('historyResult').innerHTML=`<b>${date}</b> · <span class="daystatus ${d.closed?'closed':''}">${d.closed?'Cerrado':'Abierto / borrador'}</span><p>Ventas calculadas: <b>${money(total)}</b></p><div class="tablewrap"><table><thead><tr><th>Producto</th><th>Inicio</th><th>Entradas</th><th>Final</th><th>Vend.</th><th>Importe</th></tr></thead><tbody>${rows}</tbody></table></div><p class="small">Caja: inicial ${money(d.cash.cashStart)} · crédito ${money(d.cash.creditSales)} · gastos ${money(d.cash.expenses)} · retiros ${money(d.cash.withdrawals)} · contado ${money(d.cash.cashCounted)}</p>`;
+}
+function download(name,content,type){const blob=new Blob([content],{type});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000)}
+function exportBackup(){download('LYMarket_respaldo_'+today()+'.json',JSON.stringify(state,null,2),'application/json')}
+function exportCsv(){
+ const lines=[['Fecha','Estado','Producto','Unidad','Precio CUP','Inicio','Entradas','Final','Vendido','Importe CUP','Efectivo inicial','Crédito','Gastos','Retiros','Efectivo contado']];
+ Object.keys(state.days).sort().forEach(date=>{const d=state.days[date];state.products.forEach(p=>{const v=d.inventory[p.id]||{};const sold=Math.max(0,num(v.start)+num(v.entry)-num(v.final));const price=(d.priceSnapshot&&d.priceSnapshot[p.id]!=null)?num(d.priceSnapshot[p.id]):num(p.price);lines.push([date,d.closed?'Cerrado':'Abierto',p.name,p.unit,price,v.start||0,v.entry||0,v.final||0,sold,sold*price,d.cash.cashStart,d.cash.creditSales,d.cash.expenses,d.cash.withdrawals,d.cash.cashCounted])})});
+ const csv=lines.map(row=>row.map(x=>'"'+String(x??'').replace(/"/g,'""')+'"').join(';')).join('\r\n');
+ download('LYMarket_historial_'+today()+'.csv','\ufeff'+csv,'text/csv;charset=utf-8');
+}
+function importBackup(file){
+ const reader=new FileReader();reader.onload=()=>{try{const incoming=JSON.parse(reader.result);if(!Array.isArray(incoming.products)||!incoming.days)throw Error('formato');if(!confirm('Importar reemplazará los datos actuales de L&Y Market en este navegador. ¿Continuar?'))return;state=incoming;save();initUI();alert('Respaldo importado correctamente.')}catch(e){alert('No se pudo importar. Comprueba que sea un respaldo de L&Y Market.')}};reader.readAsText(file)
+}
+
+const billDenominations=[20000,10000,5000,2000,1000,500,200,100,50,20,10,5];
+function renderBillCounter(){
+ const host=$('billInputs');
+ host.innerHTML='';
+ billDenominations.forEach(value=>{
+  const wrap=document.createElement('div');
+  wrap.innerHTML=`<label for="bill-${value}">Billetes de ${value.toLocaleString('es-ES')} CUP</label><input id="bill-${value}" type="number" min="0" step="1" inputmode="numeric" value="0" data-bill="${value}">`;
+  host.appendChild(wrap);
+ });
+ host.querySelectorAll('[data-bill]').forEach(input=>input.addEventListener('input',updateBillTotal));
+ updateBillTotal();
+}
+function updateBillTotal(){
+ let total=0;
+ document.querySelectorAll('[data-bill]').forEach(input=>{
+  const count=Math.max(0,Math.floor(Number(input.value)||0));
+  total+=count*Number(input.dataset.bill);
+ });
+ $('billTotal').textContent=money(total);
+ return total;
+}
+
+function initUI(){
+ renderCatalog();
+ const date=state.activeDate||today();$('workDate').value=date;$('historyDate').value=date;
+ getDay(date);renderInventory();
+}
+$('workDate').addEventListener('change',()=>{const date=$('workDate').value||today();state.activeDate=date;getDay(date);save();renderInventory()});
+['cashStart','creditSales','expenses','withdrawals','cashCounted'].forEach(k=>$(k).addEventListener('change',recalc));
+$('addProduct').addEventListener('click',()=>{
+ const name=$('newName').value.trim(),unit=$('newUnit').value.trim(),price=$('newPrice').value;
+ if(!name||!unit||price===''||Number(price)<0){alert('Escribe el nombre, la unidad de venta y un precio válido.');return}
+ const id='p-'+Date.now()+'-'+Math.random().toString(36).slice(2,7);
+ state.products.push({id,name,unit,price:num(price)});
+ Object.keys(state.days).forEach(date=>{if(!state.days[date].inventory[id])state.days[date].inventory[id]={start:0,entry:0,final:0}});
+ $('newName').value='';$('newUnit').value='';$('newPrice').value='';
+ save();renderCatalog();renderInventory();
+});
+$('saveDraft').addEventListener('click',()=>{const d=getDay($('workDate').value);if(d.closed||isBlocked($('workDate').value)){alert('No se puede guardar esta jornada.');return}recalc();alert('Progreso guardado en este teléfono.')});
+$('closeDay').addEventListener('click',()=>{
+ const date=$('workDate').value||today();const d=getDay(date);
+ if(d.closed||isBlocked(date)){alert('Esta jornada está bloqueada.');return}
+ const prev=Object.keys(state.days).filter(x=>x<date).sort().pop();
+ if(prev&&!state.days[prev].closed){alert('Primero cierra la jornada anterior ('+prev+').');return}
+ // Store current calculated sales in a close snapshot to preserve the prices used that day.
+ d.priceSnapshot={};state.products.forEach(p=>d.priceSnapshot[p.id]=num(p.price));
+ d.closed=true;state.activeDate=date;save();renderInventory();alert('Día cerrado y guardado. Las existencias finales se usarán como inventario inicial de la siguiente jornada.');
+});
+$('viewHistory').addEventListener('click',history);
+$('exportBackup').addEventListener('click',exportBackup);
+$('exportCsv').addEventListener('click',exportCsv);
+$('importBackup').addEventListener('click',()=>$('backupFile').click());
+$('backupFile').addEventListener('change',e=>{if(e.target.files&&e.target.files[0])importBackup(e.target.files[0]);e.target.value=''});
+load();if(!Array.isArray(state.debts))state.debts=[];initUI();renderBillCounter();$('debtDate').value=today();renderDebts();$('debtSearch').addEventListener('input',renderDebts);$('addDebt').addEventListener('click',()=>{const name=$('debtClient').value.trim(),concept=$('debtConcept').value.trim(),amount=Number($('debtAmount').value),date=$('debtDate').value||today();if(!name||!concept||!(amount>0)){alert('Completa el nombre, el concepto y un importe mayor que cero.');return}let c=state.debts.find(x=>x.name.toLocaleLowerCase('es')===name.toLocaleLowerCase('es'));if(!c){c={id:'c-'+Date.now()+'-'+Math.random().toString(36).slice(2,6),name,moves:[]};state.debts.push(c)}c.moves.push({id:'m-'+Date.now(),type:'debt',amount,date,concept});save();$('debtConcept').value='';$('debtAmount').value='';renderDebts();showDebtDetail(c.id);alert('Deuda guardada correctamente.');});
+$('syncLogin').addEventListener('click',connectFirebase);$('syncLogout').addEventListener('click',async()=>{if(firebaseAuth)await firebaseAuth.signOut();cloudReady=false;if(cloudUnsub)cloudUnsub();cloudUnsub=null;syncMessage('Sesión cerrada. Los cambios solo se guardan en este dispositivo hasta volver a conectar.');});
+$('useBillTotal').addEventListener('click',()=>{
+ const total=updateBillTotal();
+ $('cashCounted').value=String(total);
+ recalc();
+ $('cashCounted').scrollIntoView({behavior:'smooth',block:'center'});
+});
+$('clearBills').addEventListener('click',()=>{
+ document.querySelectorAll('[data-bill]').forEach(input=>input.value='0');
+ updateBillTotal();
+});
+})();
+</script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+</body>
+</html>
